@@ -1,6 +1,6 @@
 from nanovna import NanoVNA
+from switch import SwitchAdapter
 import numpy as np
-import RPi.GPIO as GPIO
 
 class RFMultiplexer:
     """
@@ -35,58 +35,12 @@ class RFMultiplexer:
         self.hi_start = bit_start + bit_width + bit_padding
 
         self.vna = NanoVNA()
-        self.vna.open()
 
         lo = (self.lo_start - 2) * 1e6
         hi = (self.hi_start + self.bit_width + 2) * 1e6
         self.vna.set_frequencies(start=lo, stop=hi, points=201)
 
-        # GPIO setup
-        self.LS_PIN = 18
-        self.V1_PIN = 16
-        self.V2_PIN = 15
-        self.V3_PIN = 13
-        self.V4_PIN = 11
-
-        GPIO.setmode(GPIO.BCM)
-        for pin in [self.LS_PIN, self.V1_PIN, self.V2_PIN, self.V3_PIN, self.V4_PIN]:
-            GPIO.setup(pin, GPIO.OUT)
-            GPIO.output(pin, GPIO.LOW)
-
-    def _set_control_pins(self, ls, v4, v3, v2, v1):
-        GPIO.output(self.LS_PIN, GPIO.HIGH if ls else GPIO.LOW)
-        GPIO.output(self.V1_PIN, GPIO.HIGH if v1 else GPIO.LOW)
-        GPIO.output(self.V2_PIN, GPIO.HIGH if v2 else GPIO.LOW)
-        GPIO.output(self.V3_PIN, GPIO.HIGH if v3 else GPIO.LOW)
-        GPIO.output(self.V4_PIN, GPIO.HIGH if v4 else GPIO.LOW)
-
-    def switchPort(self, port_no):
-        """
-        Set the PE42512 to activate the given port number (0-11 = RF1-RF12).
-        """
-        if not (0 <= port_no <= 11):
-            raise ValueError("Port number must be between 0 and 11")
-
-        # Truth table matches ports 0–11 to V4 V3 V2 V1 under LS = 0
-        control_bits = [
-            [0, 0, 0, 0],  # Port 0 (RF1)
-            [1, 0, 0, 0],  # Port 1 (RF2)
-            [0, 1, 0, 0],  # Port 2 (RF3)
-            [1, 1, 0, 0],  # Port 3 (RF4)
-            [0, 0, 1, 0],  # Port 4 (RF5)
-            [1, 0, 1, 0],  # Port 5 (RF6)
-            [0, 1, 1, 0],  # Port 6 (RF7)
-            [1, 1, 1, 0],  # Port 7 (RF8)
-            [0, 0, 0, 1],  # Port 8 (RF9)
-            [1, 0, 0, 1],  # Port 9 (RF10)
-            [0, 1, 0, 1],  # Port 10 (RF11)
-            [1, 1, 0, 1],  # Port 11 (RF12)
-        ]
-
-        # LS must be 0 to use standard binary control mode
-        ls = 0
-        v4, v3, v2, v1 = control_bits[port_no]
-        self._set_control_pins(ls, v4, v3, v2, v1)
+        self.switch_adapter = SwitchAdapter()
 
     def _detect_bit(self, frequencies, s11):
         """
@@ -149,3 +103,6 @@ class RFMultiplexer:
             results[port] = bit
         self.address_dict = results
         return results
+
+    def switchPort(self, port_no):
+        self.switch_adapter.switchPort(port_no)

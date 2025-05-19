@@ -3,6 +3,9 @@ scikit-rf
 pillow
 pyserial
 
+lgpio
+rpi-lgpio
+
 fastapi
 pydantic
 uvicorn

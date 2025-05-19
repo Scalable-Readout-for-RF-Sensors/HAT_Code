@@ -419,6 +419,10 @@ class NanoVNA:
         n = self.skrf_network(x)
         n.plot_s_smith()
         return n
+    
+    def save_plot():
+        pl.save("fig.png")
+
 
 # -- Plotting raw data (for testing) --
 
