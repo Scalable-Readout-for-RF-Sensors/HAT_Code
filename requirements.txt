@@ -2,3 +2,7 @@ matplotlib
 scikit-rf
 pillow
 pyserial
+
+fastapi
+pydantic
+uvicorn
