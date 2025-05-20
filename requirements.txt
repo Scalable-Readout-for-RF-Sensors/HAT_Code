@@ -5,6 +5,7 @@ pyserial
 
 lgpio
 rpi-lgpio
+gpiozero 
 
 fastapi
 pydantic

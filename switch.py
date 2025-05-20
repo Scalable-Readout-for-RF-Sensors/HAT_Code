@@ -1,34 +1,31 @@
-import lgpio
+from gpiozero import DigitalOutputDevice
+import time
 
 class SwitchAdapter:
     def __init__(self):
         self.pins = {
-            'LS': 18,
-            'V1': 16,
-            'V2': 15,
-            'V3': 13,
-            'V4': 11,
+            'LS': DigitalOutputDevice(24),
+            'V1': DigitalOutputDevice(23),
+            'V2': DigitalOutputDevice(22),
+            'V3': DigitalOutputDevice(27),
+            'V4': DigitalOutputDevice(17),
         }
 
-        self.h = lgpio.gpiochip_open(0)
-        for pin in self.pins.values():
-            lgpio.gpio_claim_output(self.h, pin, 0)
-
     def _set_control_pins(self, ls, v4, v3, v2, v1):
-        lgpio.gpio_write(self.h, self.pins['LS'], ls)
-        lgpio.gpio_write(self.h, self.pins['V1'], v1)
-        lgpio.gpio_write(self.h, self.pins['V2'], v2)
-        lgpio.gpio_write(self.h, self.pins['V3'], v3)
-        lgpio.gpio_write(self.h, self.pins['V4'], v4)
+        self.pins['LS'].value = ls
+        self.pins['V1'].value = v1
+        self.pins['V2'].value = v2
+        self.pins['V3'].value = v3
+        self.pins['V4'].value = v4
+        #time.sleep(0.002)  # optional: allow hardware settling time
 
     def switchPort(self, port_no):
         """
-        Set the PE42512 to activate the given port number (0-11 = RF1-RF12).
+        Set the PE42512 to activate the given port number (0–11 = RF1–RF12).
         """
         if not (0 <= port_no <= 11):
             raise ValueError("Port number must be between 0 and 11")
 
-        # Truth table matches ports 0–11 to V4 V3 V2 V1 under LS = 0
         control_bits = [
             [0, 0, 0, 0],  # Port 0 (RF1)
             [1, 0, 0, 0],  # Port 1 (RF2)
@@ -44,7 +41,6 @@ class SwitchAdapter:
             [1, 1, 0, 1],  # Port 11 (RF12)
         ]
 
-        # LS must be 0 to use standard binary control mode
         ls = 0
         v4, v3, v2, v1 = control_bits[port_no]
         self._set_control_pins(ls, v4, v3, v2, v1)
