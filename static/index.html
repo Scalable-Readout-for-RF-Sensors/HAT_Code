@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>RF Mux Web UI</title>
+</head>
+
+<body>
+    <h2>RF Multiplexer Interface</h2>
+    <label for="port">Port:</label>
+    <input id="port" type="number" min="0" max="11" value="0" />
+    <button onclick="runPort()">Run</button>
+    <button onclick="switchPort()">Switch</button>
+    <button onclick="runAll()">Run All</button>
+    <pre id="output"></pre>
+
+    <script>
+        function runPort() {
+            const port = parseInt(document.getElementById('port').value);
+            fetch(`/read/${port}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+                })
+                .catch(err => {
+                    document.getElementById('output').textContent = 'Error reading port: ' + err;
+                });
+        }
+
+        function switchPort() {
+            const port = parseInt(document.getElementById('port').value);
+            fetch(`/switch/${port}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+                })
+                .catch(err => {
+                    document.getElementById('output').textContent = 'Error switching port: ' + err;
+                });
+        }
+
+        function runAll() {
+            fetch('/read_all')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+                })
+                .catch(err => {
+                    document.getElementById('output').textContent = 'Error reading all ports: ' + err;
+                });
+        }
+    </script>
+</body>
+
+</html>

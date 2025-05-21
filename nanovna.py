@@ -302,19 +302,28 @@ class NanoVNA:
         segment_length = 101
         array0 = []
         array1 = []
+        frequencies_used = []
+
         if self._frequencies is None:
             self.fetch_frequencies()
+
         freqs = self._frequencies
         while len(freqs) > 0:
-            seg_start = freqs[0]
-            seg_stop = freqs[min(segment_length-1, len(freqs)-1)]
             length = min(segment_length, len(freqs))
+            seg_start = freqs[0]
+            seg_stop = freqs[length - 1]
+            
             self.send_scan(seg_start, seg_stop, length)
             array0.extend(self.data(0))
             array1.extend(self.data(1))
+            frequencies_used.extend(np.linspace(seg_start, seg_stop, length))
+
             freqs = freqs[segment_length:]
+
+        self._frequencies = np.array(frequencies_used)
         self.resume()
         return (array0, array1)
+
 
     def capture(self):
         """
