@@ -43,3 +43,10 @@ class SwitchAdapter:
         ls = 0
         v4, v3, v2, v1 = control_bits[port_no]
         self._set_control_pins(ls, v4, v3, v2, v1)
+    
+    def close(self):
+        """
+        Gracefully release all GPIO pins.
+        """
+        for pin in self.pins.values():
+            pin.close()

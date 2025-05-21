@@ -1,69 +1,51 @@
 # ui.py - Backend server for NanoVNA web interface
-
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-import numpy as np
-import matplotlib.pyplot as plt
-import io
-import base64
-from nanovna import NanoVNA
 from rf_mux import RFMultiplexer
+import uvicorn
+from contextlib import asynccontextmanager
+import os
 
-app = FastAPI()
+mux = None
 
-# CORS setup for Angular frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global mux
+    mux = RFMultiplexer()
+    yield
+    mux.close()
 
-# Mount static frontend files
-app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend")
+app = FastAPI(lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-nvna = NanoVNA()
-nvna.open()
-mux = RFMultiplexer(size=12)
+@app.get("/", response_class=HTMLResponse)
+def index():
+    index_path = os.path.join("static", "index.html")
+    if os.path.exists(index_path):
+        with open(index_path) as f:
+            return f.read()
+    return HTMLResponse("<h1>RF Mux Web Interface</h1><p>No index.html found.</p>", status_code=200)
 
-class ReadRequest(BaseModel):
-    port: int
+@app.get("/read/{port}")
+def read_port(port: int):
+    if mux and 0 <= port < mux.size:
+        bit = mux.read(port)
+        return {"port": port, "bit": bit}
+    return JSONResponse(status_code=400, content={"error": "Invalid port number."})
 
 @app.get("/read_all")
-async def read_all():
-    results = mux.readAll()
-    return JSONResponse(content=results)
+def read_all():
+    if mux:
+        return mux.readAll()
+    return JSONResponse(status_code=500, content={"error": "Multiplexer not initialized."})
 
-@app.post("/read_port")
-async def read_port(req: ReadRequest):
-    bit = mux.read(req.port)
-    return JSONResponse(content={"port": req.port, "bit": bit})
-
-@app.get("/plot")
-async def get_plot():
-    mux.switchPort(0)  # Default to port 0
-    freqs = nvna.frequencies
-    s11 = nvna.data(0)
-    s11_db = 20 * np.log10(np.abs(s11))
-
-    fig, ax = plt.subplots()
-    ax.plot(freqs / 1e6, s11_db)
-    ax.set_xlabel("Frequency (MHz)")
-    ax.set_ylabel("S11 Magnitude (dB)")
-    ax.set_title("S11 Plot")
-    ax.grid(True)
-
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    buf.seek(0)
-    img_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    return JSONResponse(content={"image": f"data:image/png;base64,{img_base64}"})
+@app.get("/switch/{port}")
+def switch_port(port: int):
+    if mux and 0 <= port < mux.size:
+        mux.switchPort(port)
+        return {"port": port, "status": "switched"}
+    return JSONResponse(status_code=400, content={"error": "Invalid port number."})
 
 if __name__ == "__main__":
-    uvicorn.run("ui:app", host="0.0.0.0", port=80, reload=True)
+    uvicorn.run("ui:app", host="0.0.0.0", port=8000)

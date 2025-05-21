@@ -1,7 +1,7 @@
 from nanovna import NanoVNA
 from switch import SwitchAdapter
 import numpy as np
-import typing
+import os, datetime,typing
 
 class RFMultiplexer:
     """
@@ -18,15 +18,15 @@ class RFMultiplexer:
         vna (NanoVNA): Instance of the NanoVNA for performing measurements.
     """
 
-    def __init__(self, size:int=12, bit_width:int=10, bit_start:int=40, bit_padding:int=5):
+    def __init__(self, size:int=12, bit_width:int=5, bit_start:int=10, bit_padding:int=1):
         """
         Initializes the RFMultiplexer instance and configures the NanoVNA.
 
         Args:
             size (int): Number of ports. Default is 12.
-            bit_width (int): Frequency width (MHz) of bit detection window. Default is 10.
-            bit_start (int): Starting frequency (MHz) for low-bit band. Default is 40.
-            bit_padding (int): Padding (MHz) between low and high bit bands. Default is 5.
+            bit_width (int): Frequency width (MHz) of bit detection window. Default is 5.
+            bit_start (int): Starting frequency (MHz) for low-bit band. Default is 10.
+            bit_padding (int): Padding (MHz) between low and high bit bands. Default is 1.
         """
         self.size = size
         self.address_dict = {}
@@ -35,10 +35,13 @@ class RFMultiplexer:
         self.bit_padding = bit_padding
         self.hi_start = bit_start + bit_width + bit_padding
 
+        self.DATA_PATH = "./data"
+        os.makedirs(self.DATA_PATH, exist_ok=True)
+
         self.vna = NanoVNA()
 
         lo = (self.lo_start - 2) * 1e6
-        hi = (self.hi_start + self.bit_width + 2) * 1e6
+        hi = (self.hi_start + self.bit_width) * 1e6
         self.vna.set_frequencies(start=lo, stop=hi, points=201)
 
         self.switch_adapter = SwitchAdapter()
@@ -55,7 +58,7 @@ class RFMultiplexer:
             int or None: Detected bit (0 or 1), or None if no bit detected.
         """
         s11_db = 20 * np.log10(np.abs(s11))
-        dip_threshold = -5  # dB threshold for detecting a dip
+        dip_threshold = -10  # dB threshold for detecting a dip
 
         lo_range = (self.lo_start * 1e6, (self.lo_start + self.bit_width) * 1e6)
         hi_range = (self.hi_start * 1e6, (self.hi_start + self.bit_width) * 1e6)
@@ -94,9 +97,10 @@ class RFMultiplexer:
             self.vna.set_frequencies(start=lo, stop=hi, points=201)
             freqs = self.vna.frequencies 
 
-        s11 = self.vna.data(0)
+        s11 = self.vna.scan()[0]
         bit = self._detect_bit(typing.cast(np.ndarray,freqs), s11)
         self.address_dict[str(port)] = bit
+        print(f"Bit: {bit}")
         return bit
 
     def readAll(self):
@@ -118,3 +122,33 @@ class RFMultiplexer:
         Set the PE42512 to activate the given port number (0-11 = RF1-RF12).
         """
         self.switch_adapter.switchPort(port_no)
+        print(f"Switched to port: {port_no}", end="\r")
+
+    def save(self, filename: str = "snapshot.s1p"):
+        """
+        Saves the current S-parameter data from the NanoVNA to a Touchstone (.s1p) file.
+
+        Args:
+            filename (str): Path to the output Touchstone file.
+        """
+        self.vna.fetch_frequencies()
+        s11 = self.vna.scan()[0]
+        network = self.vna.skrf_network(s11)
+        network.write_touchstone(os.path.join(self.DATA_PATH, filename))
+        print(f"[INFO] Snapshot saved to {filename}")
+
+    def record(self, sweeps: int = 5):
+        """
+        Records multiple sweep snapshots and saves them as Touchstone files.
+
+        Args:
+            sweeps (int): Number of sweeps to record.
+        """
+        for i in range(sweeps):
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"sweep_{i+1}_{timestamp}.s1p"
+            self.save(filename)
+            print(f"[INFO] Sweep {i+1}/{sweeps} saved as {filename}")
+
+    def close(self):
+        self.switch_adapter.close()
