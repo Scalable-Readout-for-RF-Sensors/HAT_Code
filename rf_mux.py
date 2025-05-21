@@ -98,7 +98,7 @@ class RFMultiplexer:
             freqs = self.vna.frequencies 
 
         s11 = self.vna.scan()[0]
-        bit = self._detect_bit(typing.cast(np.ndarray,freqs), s11)
+        bit = self._detect_bit(typing.cast(np.ndarray,freqs), typing.cast(np.ndarray,s11))
         self.address_dict[str(port)] = bit
         print(f"Bit: {bit}")
         return bit
