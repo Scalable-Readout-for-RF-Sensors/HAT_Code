@@ -40,7 +40,7 @@ if __name__ == "__main__":
                     print(f"Port {port+1}: Bit {bit}")
             elif arg.isdigit():
                 port = int(arg)
-                if 0 <= port < mux.size:
+                if 0 <= port <= mux.size:
                     bit = mux.read(port-1)
                     print(f"Port {port}: Bit {bit}")
                 else:
