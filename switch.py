@@ -1,5 +1,4 @@
 from gpiozero import DigitalOutputDevice
-import time
 
 class SwitchAdapter:
     def __init__(self):
@@ -19,7 +18,7 @@ class SwitchAdapter:
         self.pins['V4'].value = v4
         #time.sleep(0.002)  # optional: allow hardware settling time
 
-    def switchPort(self, port_no):
+    def switchPort(self, port_no: int):
         """
         Set the PE42512 to activate the given port number (0–11 = RF1–RF12).
         """

@@ -1,6 +1,7 @@
 from nanovna import NanoVNA
 from switch import SwitchAdapter
 import numpy as np
+import typing
 
 class RFMultiplexer:
     """
@@ -17,7 +18,7 @@ class RFMultiplexer:
         vna (NanoVNA): Instance of the NanoVNA for performing measurements.
     """
 
-    def __init__(self, size=12, bit_width=10, bit_start=40, bit_padding=5):
+    def __init__(self, size:int=12, bit_width:int=10, bit_start:int=40, bit_padding:int=5):
         """
         Initializes the RFMultiplexer instance and configures the NanoVNA.
 
@@ -42,7 +43,7 @@ class RFMultiplexer:
 
         self.switch_adapter = SwitchAdapter()
 
-    def _detect_bit(self, frequencies, s11):
+    def _detect_bit(self, frequencies:np.typing.NDArray[typing.Any], s11:np.typing.NDArray[typing.Any]):
         """
         Analyzes S11 data to detect the presence of a '0' or '1' bit based on frequency dips.
 
@@ -72,7 +73,7 @@ class RFMultiplexer:
         else:
             return None
 
-    def read(self, port):
+    def read(self, port:int):
         """
         Reads the bit value from the specified port.
 
@@ -84,9 +85,17 @@ class RFMultiplexer:
         """
         self.switchPort(port)
         self.vna.resume()
-        freqs = self.vna.frequencies
+        if self.vna.frequencies is not None:
+            freqs = self.vna.frequencies 
+        else:
+
+            lo = (self.lo_start - 2) * 1e6
+            hi = (self.hi_start + self.bit_width + 2) * 1e6
+            self.vna.set_frequencies(start=lo, stop=hi, points=201)
+            freqs = self.vna.frequencies 
+
         s11 = self.vna.data(0)
-        bit = self._detect_bit(freqs, s11)
+        bit = self._detect_bit(typing.cast(np.ndarray,freqs), s11)
         self.address_dict[str(port)] = bit
         return bit
 
@@ -104,5 +113,8 @@ class RFMultiplexer:
         self.address_dict = results
         return results
 
-    def switchPort(self, port_no):
+    def switchPort(self, port_no:int):
+        """
+        Set the PE42512 to activate the given port number (0-11 = RF1-RF12).
+        """
         self.switch_adapter.switchPort(port_no)
