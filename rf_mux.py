@@ -1,7 +1,7 @@
 from nanovna import NanoVNA
 from switch import SwitchAdapter
 import numpy as np
-import os, datetime
+import os, datetime, time
 
 class RFMultiplexer:
     """
@@ -42,7 +42,7 @@ class RFMultiplexer:
 
         lo = (self.lo_start - 2) * 1e6
         hi = (self.hi_start + self.bit_width) * 1e6
-        self.vna.set_frequencies(start=lo, stop=hi, points=201)
+        self.vna.set_frequencies(start=lo, stop=hi, points=10)
 
         self.switch_adapter = SwitchAdapter()
 
@@ -57,24 +57,29 @@ class RFMultiplexer:
         Returns:
             int or None: Detected bit (0 or 1), or None if no bit detected.
         """
-        s11_db = 20 * np.log10(np.abs(s11))
-        dip_threshold = -10  # dB threshold for detecting a dip
+        try:
+            s11_db = 20 * np.log10(np.abs(s11))
+            dip_threshold = -10  # dB threshold for detecting a dip
 
-        lo_range = (self.lo_start * 1e6, (self.lo_start + self.bit_width) * 1e6)
-        hi_range = (self.hi_start * 1e6, (self.hi_start + self.bit_width) * 1e6)
+            lo_range = (self.lo_start * 1e6, (self.lo_start + self.bit_width) * 1e6)
+            hi_range = (self.hi_start * 1e6, (self.hi_start + self.bit_width) * 1e6)
 
-        lo_mask = (frequencies >= lo_range[0]) & (frequencies <= lo_range[1])
-        hi_mask = (frequencies >= hi_range[0]) & (frequencies <= hi_range[1])
+            lo_mask = (frequencies >= lo_range[0]) & (frequencies <= lo_range[1])
+            hi_mask = (frequencies >= hi_range[0]) & (frequencies <= hi_range[1])
 
-        lo_dip = np.min(s11_db[lo_mask])
-        hi_dip = np.min(s11_db[hi_mask])
+            lo_dip = np.min(s11_db[lo_mask])
+            hi_dip = np.min(s11_db[hi_mask])
 
-        if lo_dip <= dip_threshold:
-            return 0
-        elif hi_dip <= dip_threshold:
-            return 1
-        else:
+            if lo_dip <= dip_threshold:
+                return 0
+            elif hi_dip <= dip_threshold:
+                return 1
+            else:
+                return None
+        except Exception as e:
+            print(e)
             return None
+
 
     def read(self, port):
         """
@@ -88,11 +93,12 @@ class RFMultiplexer:
         """
         self.switchPort(port)
         freqs = self.vna.frequencies
-        print("Reading from VNA...", end="\n")
+        print("Reading from VNA...", end="\r")
         s11 = self.vna.scan()[0]
+        #if len(s11) == 0: raise RuntimeError("VNA scan returned empty data.")
         bit = self._detect_bit(freqs, s11)
         self.address_dict[str(port)] = bit
-        print(f"Bit: {bit}")
+        #print(f"Bit: {bit}")
         return bit
 
     def readAll(self):
@@ -111,7 +117,7 @@ class RFMultiplexer:
 
     def switchPort(self, port_no):
         self.switch_adapter.switchPort(port_no)
-        print(f"Switched to port: {port_no}", end="\r")
+        #print(f"Switched to port: {port_no}", end="\r")
 
     def save(self, filename: str = "snapshot.s1p"):
         """
