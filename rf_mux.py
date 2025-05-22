@@ -1,7 +1,10 @@
-from nanovna import NanoVNA
-from switch import SwitchAdapter
 import numpy as np
 import os, datetime, typing
+
+from vna_adapter import VNAAdapter
+from nanovna import NanoVNA
+from switch_adapter import SwitchAdapter
+from switch import PE42512
 
 class RFMultiplexer:
     """
@@ -18,7 +21,9 @@ class RFMultiplexer:
         vna (NanoVNA): Instance of the NanoVNA for performing measurements.
     """
 
-    def __init__(self, size:int=12, bit_width:int=5, bit_start:int=10, bit_padding:int=1):
+    def __init__(self, size:int=12, bit_width:int=5, bit_start:int=10, bit_padding:int=1,
+                 vna: VNAAdapter = NanoVNA(),
+                 switch: SwitchAdapter = PE42512()):
         """
         Initializes the RFMultiplexer instance and configures the NanoVNA.
 
@@ -27,6 +32,8 @@ class RFMultiplexer:
             bit_width (int): Frequency width (MHz) of bit detection window. Default is 5.
             bit_start (int): Starting frequency (MHz) for low-bit band. Default is 10.
             bit_padding (int): Padding (MHz) between low and high bit bands. Default is 1.
+            vna (VNAAdapter): The adapter module which will communicate with the VNA, Default is a NanoVNA instance.
+            switch (SwitchAdapter): The adapter module which will controll the RF switch hardware. Default is a PE42512 switch adapter.
         """
         self.size = size
         self.address_dict = {}
@@ -38,13 +45,13 @@ class RFMultiplexer:
         self.DATA_PATH = "./data"
         os.makedirs(self.DATA_PATH, exist_ok=True)
 
-        self.vna = NanoVNA()
+        self.vna = vna
 
         lo = (self.lo_start - 2) * 1e6
         hi = (self.hi_start + self.bit_width) * 1e6
         self.vna.set_frequencies(start=lo, stop=hi, points=10)
 
-        self.switch_adapter = SwitchAdapter()
+        self.switch_adapter = switch
 
     def _detect_bit(self, frequencies:np.typing.NDArray[typing.Any], s11:np.typing.NDArray[typing.Any]):
         """
@@ -93,14 +100,14 @@ class RFMultiplexer:
         """
         self.switchPort(port)
         self.vna.resume()
-        if self.vna.frequencies is not None:
-            freqs = self.vna.frequencies 
+        if self.vna.get_frequencies() is not None:
+            freqs = self.vna.get_frequencies() 
         else:
 
             lo = (self.lo_start - 2) * 1e6
             hi = (self.hi_start + self.bit_width + 2) * 1e6
             self.vna.set_frequencies(start=lo, stop=hi, points=201)
-            freqs = self.vna.frequencies 
+            freqs = self.vna.get_frequencies()
 
         s11 = self.vna.scan()[0]
         bit = self._detect_bit(typing.cast(np.ndarray,freqs), typing.cast(np.ndarray,s11))

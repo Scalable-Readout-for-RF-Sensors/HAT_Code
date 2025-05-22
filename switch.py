@@ -1,6 +1,7 @@
 from gpiozero import DigitalOutputDevice
+from switch_adapter import SwitchAdapter
 
-class SwitchAdapter:
+class PE42512(SwitchAdapter):
     def __init__(self):
         self.pins = {
             'LS': DigitalOutputDevice(24),

@@ -16,9 +16,11 @@ Adapted by: Djan Gural Tanova
 import serial
 import numpy as np
 import pylab as pl
-import struct
+import skrf as sk
 import time
 from serial.tools import list_ports
+
+from vna_adapter import VNAAdapter
 
 VID = 0x0483
 PID = 0x5740
@@ -32,7 +34,7 @@ def getport():
     raise OSError("NanoVNA device not found")
 
 
-class NanoVNA:
+class NanoVNA(VNAAdapter):
     def __init__(self, dev=None):
         self.dev = dev or getport()
         self.serial = None
@@ -129,6 +131,9 @@ class NanoVNA:
         data = self.fetch_data()
         self._frequencies = np.array([float(line) for line in data.splitlines() if line.strip().replace('.', '').isdigit()])
 
+    def get_frequencies(self):
+        return self._frequencies
+    
     def data(self, array=0):
         self.send_command(f"data {array}\r")
         data = self.fetch_data()
@@ -203,3 +208,9 @@ class NanoVNA:
         pl.grid(True)
         pl.xlim(self.frequencies[0], self.frequencies[-1])
         pl.plot(self.frequencies, 20*np.log10(np.abs(x)))
+
+    def skrf_network(self, x) -> sk.Network:
+        n = sk.Network()
+        n.frequency = sk.Frequency.from_f(self.frequencies / 1e6, unit='mhz')
+        n.s = x
+        return n
